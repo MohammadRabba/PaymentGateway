@@ -1,0 +1,35 @@
+# syntax=docker/dockerfile:1.7
+
+# Migration runner image. Applies EF Core migrations to the SQL Server before the API starts.
+# Used as a one-shot init container in production-like deployments.
+
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+COPY Directory.Build.props Directory.Packages.props PaymentGateway.sln ./
+COPY src/PaymentGateway.Domain/PaymentGateway.Domain.csproj src/PaymentGateway.Domain/
+COPY src/PaymentGateway.Application/PaymentGateway.Application.csproj src/PaymentGateway.Application/
+COPY src/PaymentGateway.Infrastructure/PaymentGateway.Infrastructure.csproj src/PaymentGateway.Infrastructure/
+COPY src/PaymentGateway.Api/PaymentGateway.Api.csproj src/PaymentGateway.Api/
+
+RUN dotnet restore src/PaymentGateway.Api/PaymentGateway.Api.csproj
+
+COPY src/ src/
+
+# No publish step — the entrypoint runs `dotnet ef database update` against the live DB.
+# This requires the EF Core tools. We install them at build time.
+RUN dotnet tool install --global dotnet-ef --version 9.0.0
+ENV PATH="$PATH:/root/.dotnet/tools"
+
+# Runtime stage — same SDK image (we need EF tools at runtime).
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS runtime
+WORKDIR /app
+
+# Copy the built source so EF can find the migration assembly.
+COPY --from=build /src/ /app/
+
+ENV PATH="$PATH:/root/.dotnet/tools"
+ENV ConnectionStrings__PaymentGateway=""
+
+# Wait for SQL Server, then apply migrations.
+CMD ["sh", "-c", "dotnet ef database update --project src/PaymentGateway.Infrastructure --startup-project src/PaymentGateway.Api --connection \"$ConnectionStrings__PaymentGateway\""]

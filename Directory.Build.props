@@ -1,0 +1,23 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591;CA1707;CA1860;NU1902;CA1848;CA1861;CA1805;CA1852;CA1305;CA1711</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>Open Payment Gateway &amp; Settlement Engine</Product>
+    <Authors>PaymentGateway Engineering</Authors>
+    <Copyright>Copyright (c) 2026 PaymentGateway Engineering</Copyright>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+</Project>

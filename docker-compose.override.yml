@@ -1,0 +1,17 @@
+# Development overrides. Used by `docker compose -f docker-compose.yml -f docker-compose.override.yml up`.
+# Enables hot reload, exposes debug ports, sets dev-friendly defaults.
+
+services:
+  api:
+    build:
+      dockerfile: deploy/docker/Dockerfile.api
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      Security__RequireAdminKey: "false"
+      Logging__Structured__MinimumLevel: "Debug"
+      Acquirer__Latency: "00:00:00.010"
+    ports:
+      - "8080:8080"
+      - "8081:8081"  # HTTPS for dev
+    volumes:
+      - ../src:/src:ro  # Mount source for hot reload (read-only)

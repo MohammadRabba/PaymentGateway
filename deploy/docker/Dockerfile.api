@@ -1,0 +1,41 @@
+# syntax=docker/dockerfile:1.7
+
+# Build stage
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+# Copy only the project files and restore to maximise layer caching.
+COPY Directory.Build.props Directory.Packages.props PaymentGateway.sln ./
+COPY src/PaymentGateway.Domain/PaymentGateway.Domain.csproj src/PaymentGateway.Domain/
+COPY src/PaymentGateway.Application/PaymentGateway.Application.csproj src/PaymentGateway.Application/
+COPY src/PaymentGateway.Infrastructure/PaymentGateway.Infrastructure.csproj src/PaymentGateway.Infrastructure/
+COPY src/PaymentGateway.Api/PaymentGateway.Api.csproj src/PaymentGateway.Api/
+
+RUN dotnet restore PaymentGateway.sln
+
+# Now copy the full source.
+COPY src/ src/
+
+# Build and publish the API.
+RUN dotnet publish src/PaymentGateway.Api/PaymentGateway.Api.csproj -c Release -o /app/publish /p:UseAppHost=false
+
+# Runtime stage — non-root user for production safety.
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+WORKDIR /app
+
+# Create a non-root user and switch to it.
+RUN useradd -r -u 10001 -g root appuser && \
+    chown -R appuser:root /app
+USER appuser
+
+COPY --from=build /app/publish .
+
+# Default ports. Kestrel listens on 8080 (HTTP) by default in the runtime image.
+EXPOSE 8080
+
+ENV ASPNETCORE_URLS=http://+:8080
+ENV ASPNETCORE_ENVIRONMENT=Production
+
+# The container must start correctly once dependencies are ready. The API applies EF migrations
+# on startup (Program.cs runs DbInitializer). If migrations fail, the container exits.
+ENTRYPOINT ["dotnet", "PaymentGateway.Api.dll"]

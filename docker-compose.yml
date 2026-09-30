@@ -1,0 +1,89 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: pg-sqlserver
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SQLSERVER_PASSWORD:-Your_password123}
+      MSSQL_PID: "Developer"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -Q 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - payment-gateway
+
+  redis:
+    image: redis:7-alpine
+    container_name: pg-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - payment-gateway
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: pg-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - payment-gateway
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/docker/Dockerfile.api
+    container_name: pg-api
+    environment:
+      ConnectionStrings__PaymentGateway: "Server=sqlserver,1433;Database=PaymentGateway;User Id=sa;Password=${SQLSERVER_PASSWORD:-Your_password123};TrustServerCertificate=True;MultipleActiveResultSets=true"
+      Redis__ConnectionString: "redis:6379,abortConnect=false"
+      RabbitMq__ConnectionUri: "amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672/%2f"
+      ASPNETCORE_ENVIRONMENT: "Production"
+      Security__RequireAdminKey: "true"
+      Security__AdminApiKeyHash: "${ADMIN_API_KEY_HASH}"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel-collector:4317"
+    ports:
+      - "8080:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - payment-gateway
+
+volumes:
+  sqlserver-data:
+  redis-data:
+  rabbitmq-data:
+
+networks:
+  payment-gateway:
+    driver: bridge
