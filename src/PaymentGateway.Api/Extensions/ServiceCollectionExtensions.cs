@@ -47,6 +47,23 @@ public static class ServiceCollectionExtensions
         services.Configure<RabbitMqOptions>(configuration.GetSection(RabbitMqOptions.SectionName));
         services.Configure<WebhookOptions>(configuration.GetSection(WebhookOptions.SectionName));
         services.Configure<ApiKeyAuthOptions>(configuration.GetSection(ApiKeyAuthOptions.SectionName));
+        // ---- Fraud options & services ----
+        services.Configure<FraudOptions>(configuration.GetSection(FraudOptions.SectionName));
+
+        // Register IFraudDetectionClient using IHttpClientFactory. The HttpClient base address and
+        // timeout are configured from FraudOptions at runtime.
+        services.AddHttpClient<PaymentGateway.Application.Common.IFraudDetectionClient, PaymentGateway.Infrastructure.Fraud.HttpFraudDetectionClient>((sp, client) =>
+        {
+            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<PaymentGateway.Application.Options.FraudOptions>>().Value;
+            if (!string.IsNullOrEmpty(opts.ServiceUrl))
+            {
+                client.BaseAddress = new Uri(opts.ServiceUrl);
+            }
+            client.Timeout = opts.Timeout;
+        });
+
+        // RiskGate orchestrator (scoped per request) — follows same lifetime as handlers and DbContext.
+        services.AddScoped<PaymentGateway.Application.Risk.RiskGate>();
 
         // ---- DbContext (Scoped) ----
         // The DbContext is the authoritative ledger. Scoped lifetime so each request gets its own

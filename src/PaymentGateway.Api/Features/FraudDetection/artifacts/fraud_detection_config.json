@@ -1,0 +1,69 @@
+{
+  "created_utc": "2026-09-29T20:07:21+00:00",
+  "model_name": "HistGradientBoosting (tuned)",
+  "evaluation_protocol": "chronological train -> validation -> future test",
+  "selected_threshold": 0.9600000000000001,
+  "threshold_strategy": "max_f1",
+  "threshold_note": "maximum F1 on out-of-fold development predictions",
+  "threshold_selected_on": "forward-time out-of-fold development predictions",
+  "assumed_costs_NOT_REAL_VALUES": {
+    "false_negative": 100.0,
+    "false_positive": 1.0
+  },
+  "required_prepared_input_columns": [
+    "Month",
+    "Day",
+    "TransactionAmount",
+    "LogAbsAmount",
+    "Hour",
+    "Minute",
+    "DayOfWeek",
+    "TransactionType",
+    "MerchantState",
+    "MerchantCategory",
+    "Errors"
+  ],
+  "numeric_features": [
+    "Month",
+    "Day",
+    "TransactionAmount",
+    "LogAbsAmount",
+    "Hour",
+    "Minute",
+    "DayOfWeek"
+  ],
+  "categorical_features": [
+    "TransactionType",
+    "MerchantState",
+    "MerchantCategory",
+    "Errors"
+  ],
+  "random_state": 42,
+  "training_core_rows": 300000,
+  "development_rows_refit": 975476,
+  "development_fraud_rows": 1225,
+  "future_test_rows": 243869,
+  "future_test_fraud_rows": 256,
+  "library_versions": {
+    "python": "3.13.5",
+    "scikit-learn": "1.9.1",
+    "imbalanced-learn": "0.14.2",
+    "pandas": "3.0.6",
+    "numpy": "2.5.3",
+    "joblib": "1.6.0"
+  },
+  "test_metrics_at_selected_threshold": {
+    "Threshold": 0.9600000000000001,
+    "Precision": 0.007029876977152899,
+    "Recall": 0.015625,
+    "F1": 0.009696969696969697,
+    "ROC_AUC": 0.7846233062275002,
+    "PR_AUC": 0.008687003945926326,
+    "TP": 4.0,
+    "FP": 565.0,
+    "TN": 243048.0,
+    "FN": 252.0,
+    "FPR": 0.00231925225665297,
+    "FNR": 0.984375
+  }
+}

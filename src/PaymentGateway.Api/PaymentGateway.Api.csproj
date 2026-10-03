@@ -37,4 +37,8 @@
     <InternalsVisibleTo Include="PaymentGateway.ConcurrencyTests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Features\FraudDetection\.ipynb_checkpoints\Credit_Card_Fraud_Detection_Final-checkpoint.ipynb" />
+  </ItemGroup>
+
 </Project>

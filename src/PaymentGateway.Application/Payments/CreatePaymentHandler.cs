@@ -40,6 +40,7 @@ public sealed class CreatePaymentHandler
     private readonly ICorrelationContext _correlation;
     private readonly AuditService _auditService;
     private readonly ILogger<CreatePaymentHandler> _logger;
+    private readonly PaymentGateway.Application.Risk.RiskGate _riskGate;
 
     private static readonly JsonSerializerOptions ResponseJsonOptions = new()
     {
@@ -57,7 +58,8 @@ public sealed class CreatePaymentHandler
         IIdGenerator idGenerator,
         ICorrelationContext correlation,
         AuditService auditService,
-        ILogger<CreatePaymentHandler> logger)
+        ILogger<CreatePaymentHandler> logger,
+        PaymentGateway.Application.Risk.RiskGate riskGate)
     {
         _dbContext = dbContext;
         _acquirer = acquirer;
@@ -69,6 +71,7 @@ public sealed class CreatePaymentHandler
         _correlation = correlation;
         _auditService = auditService;
         _logger = logger;
+        _riskGate = riskGate;
     }
 
     public async Task<CreatePaymentResponse> HandleAsync(CreatePaymentRequest request, CancellationToken cancellationToken)
@@ -167,6 +170,84 @@ public sealed class CreatePaymentHandler
             new { request.Amount, request.Currency, request.IdempotencyKey });
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Risk Gate: evaluate the payment BEFORE calling the acquirer.
+        RiskAssessment assessment = null!;
+        try
+        {
+            assessment = await _riskGate.EvaluateAsync(paymentId, request.MerchantId, request.Amount, request.Currency, request.CardToken, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Any unexpected exception should not break payment flow; RiskGate internally handles failures
+            // and records an Unavailable assessment. Log and continue.
+            _logger.LogWarning(ex, "RiskGate evaluation failed for payment {PaymentId}. Proceeding with acquirer call.", paymentId);
+        }
+
+        if (assessment != null && assessment.Decision == PaymentGateway.Domain.Entities.RiskDecision.Block)
+        {
+            // Persist block in a transaction and complete idempotency without calling the acquirer.
+            // reuse existing 'now' from the method scope
+            using var txnBlock = await _dbContext.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var loadedPayment = await _dbContext.Payments.FirstAsync(p => p.Id == paymentId, cancellationToken);
+                loadedPayment.MarkFailed($"Blocked by fraud gate (score {assessment.Score:F4})", now);
+
+                _auditService.Record(request.MerchantId.ToString(), "PaymentBlockedAsFraud", "Payment", paymentId,
+                    new { Score = assessment.Score, ModelVersion = assessment.ModelVersion });
+
+                // Outbox: PaymentBlockedAsFraudEvent
+                var blockEvent = new PaymentGateway.Domain.Events.PaymentBlockedAsFraudEvent
+                {
+                    EventId = _idGenerator.NewId(),
+                    PaymentId = paymentId,
+                    MerchantId = request.MerchantId,
+                    Amount = request.Amount,
+                    Currency = request.Currency,
+                    RiskScore = assessment.Score,
+                    ModelVersion = assessment.ModelVersion,
+                    OccurredAt = _clock.UtcNow,
+                    CorrelationId = _correlation.CurrentId,
+                };
+                AddOutboxMessage(blockEvent, paymentId);
+
+                var response = PaymentDtoMapping.MapToCreateResponse(loadedPayment);
+                var responseJson = JsonSerializer.Serialize(response, ResponseJsonOptions);
+                proceed.Record.Complete(403, responseJson, now);
+
+                await _dbContext.SaveChangesAsync(cancellationToken);
+                await txnBlock.CommitAsync(cancellationToken);
+
+                return response;
+            }
+            catch
+            {
+                await txnBlock.RollbackAsync(cancellationToken);
+                throw;
+            }
+        }
+        
+        // If Review, publish a review event but continue to acquirer call (shadow/review mode):
+        if (assessment != null && assessment.Decision == PaymentGateway.Domain.Entities.RiskDecision.Review)
+        {
+            var reviewEvent = new PaymentGateway.Domain.Events.PaymentFlaggedForReviewEvent
+            {
+                EventId = _idGenerator.NewId(),
+                PaymentId = paymentId,
+                MerchantId = request.MerchantId,
+                Amount = request.Amount,
+                Currency = request.Currency,
+                RiskScore = assessment.Score,
+                ModelVersion = assessment.ModelVersion,
+                OccurredAt = _clock.UtcNow,
+                CorrelationId = _correlation.CurrentId,
+            };
+            AddOutboxMessage(reviewEvent, paymentId);
+            // Note: the assessment was already added to the DbContext by RiskGate and will be saved
+            // when the post-acquirer transaction commits below. We choose to proceed to the acquirer
+            // for Review decisions (flag-and-proceed).
+        }
 
         // Step 4: Call acquirer (OUTSIDE any DB transaction). Use the deterministic idempotency key
         // so recovery can query this authorization later if needed.

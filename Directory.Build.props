@@ -10,7 +10,7 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591;CA1707;CA1860;NU1902;CA1848;CA1861;CA1805;CA1852;CA1305;CA1711</NoWarn>
+    <NoWarn>$(NoWarn);CS1591;CA1707;CA1860;NU1902;CA1848;CA1861;CA1805;CA1852;CA1305;CA1711;CA1873</NoWarn>
   </PropertyGroup>
 
   <PropertyGroup>

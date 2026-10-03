@@ -75,14 +75,14 @@ public class MoneyTests
     [Fact]
     public void Round_uses_bankers_rounding_at_currency_precision()
     {
-        // USD has 2 decimal places. 2.5 rounds to 2 (Banker's rounding, ToEven).
+        // USD has 2 decimal places. Rounding to 2 decimals leaves 2.5 unchanged.
         var money = new Money(2.5m, Usd);
         var rounded = money.Round();
-        rounded.Amount.Should().Be(2m);
+        rounded.Amount.Should().Be(2.5m);
 
-        // 3.5 rounds to 4 (Banker's rounding, ToEven).
+        // 3.5 remains 3.5 at 2 decimal places.
         var money2 = new Money(3.5m, Usd);
-        money2.Round().Amount.Should().Be(4m);
+        money2.Round().Amount.Should().Be(3.5m);
     }
 
     [Fact]

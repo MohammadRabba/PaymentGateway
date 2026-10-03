@@ -36,6 +36,8 @@ public interface IPaymentGatewayDbContext
 
     DbSet<IdempotencyRecord> IdempotencyRecords { get; }
 
+    DbSet<RiskAssessment> RiskAssessments { get; }
+
     /// <summary>
     /// EF Core Database facade. Used for raw SQL operations where SQL Server-specific
     /// locking hints (UPDLOCK, HOLDLOCK) are required for the narrow serializable critical section.

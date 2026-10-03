@@ -37,6 +37,8 @@ public sealed class PaymentGatewayDbContext : DbContext, IPaymentGatewayDbContex
 
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
+    public DbSet<RiskAssessment> RiskAssessments => Set<RiskAssessment>();
+
     public PaymentGatewayDbContext(DbContextOptions<PaymentGatewayDbContext> options)
         : base(options)
     {
