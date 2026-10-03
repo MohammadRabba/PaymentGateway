@@ -978,6 +978,7 @@ Workers resolve unknown payments, drain outboxes, retry webhooks, and support re
 
 ## License
 
-Internal. Not for redistribution. ````
-##👤 Author
+Internal. Not for redistribution. 
+
+👤 Author
 Mohammad Rabba.
